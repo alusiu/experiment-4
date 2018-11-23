@@ -48,13 +48,27 @@ AdafruitIO_WiFi io(IO_USERNAME, IO_KEY, WIFI_SSID, WIFI_PASS);
 
 AdafruitIO_Feed *rightwheelFeed = io.feed("rightwheel");      //This creates the feed and gives it the name "sensor1"
 AdafruitIO_Feed *leftwheelFeed = io.feed("leftwheel");      //This creates the feed and gives it the name "sensor1"
+
+AdafruitIO_Feed *pauseFeed = io.feed("pause");      //This creates the feed and gives it the name "sensor1"
+
 //This creates the feed and gives it the name "sensor1"
 //if the feed already exists it connects you to it.
 int refreshRate = 2000;
 int rightWheel = 500;                         //free account on AIO is limited to 30 per minute
-int leftWheel = 500;                         //free account on AIO is limited to 30 per minute
+int leftWheel = 500;
+int pauseTime = 500;
+int pauseTime2 = 500;
+
+boolean pause1 = false;
+boolean pause2 = false;
+
+//free account on AIO is limited to 30 per minute
 //free account on AIO is limited to 30 per minute
 unsigned long lastRefresh = 0;                  //used to create the sending timer
+unsigned long lastRefresh2 = 0;                  //used to create the sending timer
+unsigned long lastRefresh3 = 0;
+unsigned long lastRefresh4 = 0;//used to create the sending timer
+
 int errorCounter = 0;
 
 #define SERVO_PIN_LEFT 33
@@ -77,8 +91,8 @@ void setup()
   servoright.setPeriodHertz(50);
   servoleft.setPeriodHertz(50);
 
-  servoright.attach(SERVO_PIN_RIGHT);
-  servoleft.attach(SERVO_PIN_LEFT);
+  //servoright.attach(SERVO_PIN_RIGHT);
+  //servoleft.attach(SERVO_PIN_LEFT);
 
   connectToAIO();                           //connect to the service
 }
@@ -97,6 +111,8 @@ void connectToAIO()
   leftwheelFeed->onMessage(readIncomingLeft);
 
   rightwheelFeed->onMessage(readIncomingRight);  ///connect the feed to a callback function to handle incoming data
+
+  pauseFeed->onMessage(readIncomingPause);
 
   //update the status in the console as it attempts to make a connection
   while (io.status() < AIO_CONNECTED)
@@ -117,54 +133,57 @@ void connectToAIO()
 }
 
 
-
-
 void updateAIOfeeds()
 {
-  //if (millis() - lastRefresh >= refreshRate)
-  //{
 
   if (millis() - lastRefresh >= rightWheel) {
+    Serial.println("right on!");
+    servoright.detach();
 
-    /*  servoright.write(360);
-      } else {
-      servoleft.write(0);
-      }*/
-    for (int pos = 0; pos <= rightWheel; pos++) {
-      if (pos > 360) {
-        pos = pos % 360;
+    if (rightWheel > leftWheel) {
+      if (millis() -  lastRefresh3 >= pauseTime) {
+        lastRefresh = millis();
       }
-      servoright.write(pos);
-      servoleft.write(pos);
+    } else {
+      if (millis() -  lastRefresh3 >= pauseTime2) {
+        lastRefresh = millis();
+      }
     }
+
   } else {
-    servoright.write(0);
-    servoleft.write(0);
+
+    servoright.attach(SERVO_PIN_RIGHT);
+    lastRefresh3 = millis();
+    forward();
+    Serial.println("right off!");
   }
 
-  if (millis() - lastRefresh >= leftWheel) {
-  for (int pos1 = 0; pos1 <= leftWheel; pos1++) {
-    if (pos1 > 360) {
-      pos1 = pos1 % 360;
+  if (millis() - lastRefresh2 >= leftWheel) {
+    Serial.println("left off!");
+    servoleft.detach();
+    if (rightWheel > leftWheel) {
+      if (millis() -  lastRefresh4 >= pauseTime) {
+        lastRefresh2 = millis();
+      }
+    } else {
+      if (millis() -  lastRefresh4 >= pauseTime2) {
+        lastRefresh2 = millis();
+      }
     }
-    servoleft.write(pos1);
+
+  } else {
+    Serial.println("left on!");
+    servoleft.attach(SERVO_PIN_LEFT);
+    lastRefresh4 = millis();
+    backward();
+
   }
-} else {
-  servoleft.write(0);
+
+  io.run(); //update everything on AIO
+
 }
 
-//val1->save(random(0,255));            //////////***********remove this line.
-//////////*********It is publishing to the same channel for testing
-
-
-io.run(); //update everything on AIO
-}
-//lastRefresh = millis();
-//}
-
-
-
-void readIncomingRight(AdafruitIO_Data *inData)   ///callback function for handling the incoming data
+void readIncomingRight(AdafruitIO_Data * inData)  ///callback function for handling the incoming data
 //this was defined inside the connectAIO function.  line 82
 {
   rightWheel = atol(inData->value());
@@ -174,11 +193,36 @@ void readIncomingRight(AdafruitIO_Data *inData)   ///callback function for handl
 }
 
 
-void readIncomingLeft(AdafruitIO_Data *inData)   ///callback function for handling the incoming data
+void readIncomingLeft(AdafruitIO_Data * inData)  ///callback function for handling the incoming data
 //this was defined inside the connectAIO function.  line 82
 {
   leftWheel = atol(inData->value());
   Serial.print("Incoming Value Left: ");
   Serial.println(leftWheel);
 
+}
+
+void readIncomingPause(AdafruitIO_Data * inData)  ///callback function for handling the incoming data
+//this was defined inside the connectAIO function.  line 82
+{
+  pauseTime = atol(inData->value());
+
+  if (rightWheel > leftWheel) {
+    pauseTime2 = (rightWheel - leftWheel) + pauseTime;
+  } else {
+    pauseTime2 = (leftWheel - rightWheel) + pauseTime;
+  }
+  Serial.print("Incoming Value Left: ");
+  Serial.println(pauseTime);
+
+}
+
+void forward() {
+  servoright.write(360);
+  servoright.write(0);
+}
+
+void backward() {
+  servoleft.write(0);
+  servoleft.write(360);
 }
